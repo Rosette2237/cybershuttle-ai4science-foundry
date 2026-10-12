@@ -16,7 +16,7 @@ description: >
 
 prerequisites:
   - Georgia Tech ICE account (or any Slurm cluster with an sm_70+ NVIDIA GPU and outbound HTTPS)
-  - ~60 GB of scratch space; no sequence databases are needed
+  - ~40 GB of scratch space (31 GB used); no sequence databases are needed
 
 input:
   targets: archived CAMEO 3D target list (Wayback snapshot, sha256-checked)
@@ -35,9 +35,9 @@ output:
     - results/summary.json: means, paired differences, success criteria
 
 environment:
-  conda_env: registry/models/biology/openfold/environment.yml   # pinned export, Python 3.10, PyTorch 2.5.1 + CUDA 12.4
+  conda_env: registry/models/biology/openfold/environment.yml   # full pin; PyTorch 2.5.1, CUDA 12.4
   openfold_commit: e938c184a291bf053af3b14c1e3e8bb29aee57e2     # tag v2.2.0
-  container: null   # an Apptainer image can be built from the upstream Dockerfile; not used here
+  container: null   # not used
 
 steps:
   - name: setup
@@ -53,7 +53,7 @@ steps:
     commands:
       - sbatch scripts/run_inference.sh cameo
   - name: evaluate
-    description: Score against experimental structures and check the success criteria
+    description: Score against experimental structures and check the success criteria (~2 min, login node)
     commands:
       - source scripts/config.sh && activate_env && python scripts/evaluate.py
 
@@ -67,14 +67,16 @@ resource_requirements:
   setup:
     gpu: false
     cpu_cores: 8
-    ram_gb: 32
+    ram_gb: 64
+    estimated_runtime: "~25 min (clean build, job 6201042)"
   inference:
     gpu: true
     gpu_count: 1
     gpu_model: H100 80 GB or H200 141 GB (Slurm feature HX00)
     cpu_cores: 8
     ram_gb: 64
-  storage_gb: 60
+    estimated_runtime: "~25 min per array task for 109 chains (34-678 residues)"
+  storage_gb: 31
 
 compatible_resource_profiles:
   - resource-profiles/ice/ice-h100-h200.yaml

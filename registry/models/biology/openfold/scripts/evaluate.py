@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""Score predictions against experimental structures and check the pre-registered success criteria.
+"""Score predictions vs experimental structures; check success criteria.
 
-Metrics are computed as in OpenFold's validation step (train_openfold.py::_compute_validation_metrics):
-lDDT-Ca over resolved residues, plus Ca RMSD and GDT-TS after superposition. Writes
-results/metrics.csv (one row per prediction) and results/summary.json.
+- Metrics as in train_openfold.py::_compute_validation_metrics: lDDT-Ca, Ca-RMSD, GDT-TS
+- Writes results/metrics.csv (per prediction) and results/summary.json
 """
 import csv
 import json
@@ -18,10 +17,11 @@ from openfold.utils.loss import lddt_ca
 from openfold.utils.superimposition import superimpose
 from openfold.utils.validation_metrics import gdt_ts
 
+torch.set_num_threads(1)  # login node: 1-CPU quota, 64 visible cores
 DATA, RUNS, REPO = (Path(os.environ[k]) for k in ("OF_DATA", "OF_RUNS", "OF_REPO"))
 RESULTS = Path(__file__).resolve().parents[1] / "results"
 CA = residue_constants.atom_order["CA"]
-# Mean validation lDDT-Ca reported for each checkpoint in OpenFold's docs (OpenFold_Parameters.md)
+# Published validation lDDT-Ca (OpenFold_Parameters.md)
 PUBLISHED = {"openfold_templates": 0.9097, "openfold_no_templates": 0.9025}
 PAIRS = {
     "templates": ("openfold_templates", "alphafold2_templates"),
@@ -37,7 +37,7 @@ def ca_metrics(pred_pos, gt_pos, gt_mask):
     pred_ca = (pred_pos * gt_mask[..., None])[..., CA, :]
     superimposed, rmsd = superimpose(gt_ca, pred_ca, mask_ca)
     return {
-        "lddt_ca": float(lddt_ca(pred_pos, gt_pos, gt_mask, eps=1e-8, per_residue=False)),
+        "lddt_ca": float(lddt_ca(pred_pos, gt_pos, gt_mask, eps=1e-8, per_residue=False)),  # globals.eps
         "rmsd_ca": float(rmsd),
         "gdt_ts": float(gdt_ts(superimposed, gt_ca, mask_ca)),
     }
@@ -95,7 +95,8 @@ def summarize(rows):
             "mean_plddt": float(plddt.mean()),
             "pearson_plddt_vs_lddt_ca": float(np.corrcoef(plddt, lddt)[0, 1]),
             "inference_gpu_hours": sum(r["inference_s"] for r in res.values()) / 3600,
-            "peak_gpu_memory_mib": peak_gpu_mib(RUNS / "cameo" / c),
+            # allocator-reserved memory; bounded by the card, not a requirement
+            "nvidia_smi_peak_memory_mib": peak_gpu_mib(RUNS / "cameo" / c),
         }
         if c in PUBLISHED:
             delta = s["mean_lddt_ca"] - PUBLISHED[c]
@@ -115,7 +116,7 @@ def summarize(rows):
             "criterion_abs_mean_diff_le_0_01": bool(abs(diff.mean()) <= 0.01),
         }
 
-    # Upstream's bundled 6KWC prediction (preset model_1_ptm) vs ours with both model_1_ptm weight sets
+    # Bundled 6KWC reference vs both model_1_ptm weight sets
     ref = protein.from_pdb_string(SMOKE_REFERENCE.read_text())
     smoke = {"bundled_reference_mean_plddt": float(ref.b_factors[:, CA].mean())}
     for c in PAIRS["templates"]:

@@ -23,8 +23,8 @@ hardware:
     cores_per_node: 64
     memory_gb: 2000
   storage:
-    home_quota_gb: 30          # per user, not for environments or data
-    scratch_quota_gb: 300      # per user, ~/scratch -> /storage/ice1, 1M-file limit
+    home_quota_gb: 30          # per user
+    scratch_quota_gb: 300      # per user; ~/scratch, 1M files
     local_scratch: node-local NVMe at /tmp
     parallel_filesystem: Lustre (/storage/ice1)
 

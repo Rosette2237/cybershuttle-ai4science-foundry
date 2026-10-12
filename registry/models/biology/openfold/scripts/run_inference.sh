@@ -8,9 +8,10 @@
 #SBATCH -t 04:00:00
 #SBATCH --array=0-3
 #SBATCH -o results/logs/%x-%A_%a.out
-# Paired OpenFold vs AlphaFold2 inference on identical inputs, one array task per weight set.
-# -C HX00 selects an H100 or H200 node (sm_90).
-# Usage (from registry/models/biology/openfold): sbatch scripts/run_inference.sh [smoke|cameo]
+# GPU array job: one task per weight set, identical inputs.
+# - -C HX00: H100 or H200 (sm_90)
+# - Output: $OF_RUNS/<set>/<weight set>/{predictions/,timings.json,gpu_usage.csv}
+# - Usage (from registry/models/biology/openfold): sbatch scripts/run_inference.sh [smoke|cameo]
 set -eo pipefail
 source scripts/config.sh
 activate_env

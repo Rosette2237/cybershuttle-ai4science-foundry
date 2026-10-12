@@ -40,7 +40,7 @@ upstream:
   paper: https://doi.org/10.1038/s41592-024-02272-z
   other:
     - https://openfold.readthedocs.io
-    - https://registry.opendata.aws/openfold/   # weights + OpenProteinSet (s3://openfold)
+    - https://registry.opendata.aws/openfold/   # weights + OpenProteinSet
     - https://huggingface.co/nz/OpenFold        # weights mirror
     - https://www.biorxiv.org/content/10.1101/2022.11.20.517210
 
@@ -97,9 +97,11 @@ readiness:
   workflow_status: validated
   last_updated: "2026-10-12"
   notes: >
-    Reproducible inference workflow validated on Georgia Tech ICE (H100/H200):
-    see registry/models/biology/openfold/README.md and
-    benchmarks/results/openfold/openfold-ice-cameo.yaml.
+    Reproducible inference workflow validated on Georgia Tech ICE (H100/H200). On 109 CAMEO
+    chains OpenFold finetuning_ptm_2 scores mean lDDT-Ca 0.9096 (published 0.9097) and matches
+    AlphaFold2 weights on identical inputs (paired difference -0.002 / +0.001 with / without
+    templates). See registry/models/biology/openfold/README.md and
+    benchmarks/results/openfold/openfold-ice-cameo.yaml. Not yet run on Nexus.
 
 maintainers:
   - name: Boyang Gong

@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-"""Stage OpenFold inference inputs under $OF_DATA and write results/data_manifest.tsv.
+"""Stage inference inputs under $OF_DATA; write results/data_manifest.tsv.
 
-Targets: CAMEO 3D targets of the 13 weekly releases 2021-10-23..2022-01-15 (OpenFold's validation
-window, "three months ending January 16, 2022"), <= 700 residues. The live CAMEO 3D API is offline
-and today's PDB obsolete list has a self-referencing entry that crashes OpenFold, so both come from
-checksummed Wayback snapshots of the period. Alignments and template hits come from
-OpenProteinSet; chains without them are recorded as excluded. The bundled 6KWC example is the
-smoke test. Every target is featurized with OpenFold's own data pipeline, downloading each template
-mmCIF the featurizer asks for, so inference reads exactly the files fetched here.
+- Targets: CAMEO 3D, 13 weekly releases 2021-10-23..2022-01-15, <= 700 residues
+  (OpenFold's validation window), plus the bundled 6KWC smoke test.
+- Wayback snapshots (sha256-pinned): CAMEO API is offline; today's obsolete.dat crashes OpenFold.
+- Alignments + template hits: OpenProteinSet; chains without them are excluded.
+- Dry-run featurization fetches exactly the template mmCIFs inference will read.
 """
 import csv
 import hashlib
@@ -84,7 +82,7 @@ def stage(t, duplicates, pipeline):
         shutil.copytree(REPO / "examples/monomer/alignments" / tag, aln, dirs_exist_ok=True)
         t["msa_source"] = f"openfold/examples/monomer/alignments/{tag}"
     else:
-        # OpenProteinSet keeps one alignment per unique sequence; duplicates map to a representative
+        # one alignment per unique sequence; try duplicate chains
         for chain in [tag] + [c for c in duplicates.get(tag, []) if c != tag]:
             keys = s3_keys(f"pdb/{chain}/")
             if keys:
@@ -100,7 +98,7 @@ def stage(t, duplicates, pipeline):
     fasta = DATA / "fasta" / t["set"] / f"{tag}.fasta"
     fasta.parent.mkdir(parents=True, exist_ok=True)
     fasta.write_text(f">{tag}\n{seq}\n")
-    while True:  # dry-run featurization; fetch template mmCIFs on demand
+    while True:  # fetch template mmCIFs on demand
         try:
             feats = pipeline.process_fasta(fasta_path=str(fasta), alignment_dir=str(aln))
             break
@@ -118,7 +116,7 @@ def main():
     for name, (url, digest) in ARCHIVED.items():
         assert sha256([fetch(url, DATA / name)]) == digest, f"{name} does not match its checksum"
     for name, url in {"duplicate_pdb_chains.txt": f"{S3}/duplicate_pdb_chains.txt",
-                      "mmcif_cache.json": f"{S3}/data_caches/mmcif_cache.json"}.items():  # template release dates
+                      "mmcif_cache.json": f"{S3}/data_caches/mmcif_cache.json"}.items():
         print(sha256([fetch(url, DATA / name)]), name)
     cameo = DATA / "cameo_targets_1-year_to_2022-01-15.json"
     duplicates = {c: g for g in (line.split() for line in open(DATA / "duplicate_pdb_chains.txt")) for c in g}
@@ -130,17 +128,16 @@ def main():
         for t in json.loads(cameo.read_text())["aaData"] if WINDOW[0] <= t["date"] <= WINDOW[1]
     ]
 
-    def prefetch(t):  # failures are recorded when the target is staged
+    def prefetch(t):  # errors recorded by stage()
         try:
             fetch(f"{RCSB}/{t['pdb'].upper()}.cif", DATA / "mmcif" / f"{t['pdb']}.cif")
         except OSError:
             pass
 
-    # Ground-truth mmCIFs first: they share the template directory, which must not be empty.
-    # Targets are never used as their own templates: all were released after MAX_TEMPLATE_DATE.
+    # Ground truth first: featurizer needs a non-empty mmCIF dir (self-templating asserted in stage())
     with ThreadPoolExecutor(8) as pool:
         list(pool.map(prefetch, targets))
-    featurizer = templates.HhsearchHitFeaturizer(  # same settings run_pretrained_openfold.py uses
+    featurizer = templates.HhsearchHitFeaturizer(  # same settings as inference
         mmcif_dir=str(DATA / "mmcif"),
         max_template_date=os.environ["MAX_TEMPLATE_DATE"],
         max_hits=model_config("model_1_ptm").data.predict.max_templates,
@@ -153,7 +150,7 @@ def main():
     def safe_stage(t):
         try:
             return stage(t, duplicates, pipeline)
-        except Exception as e:  # keep failed targets out of the inference set
+        except Exception as e:  # keep failures out of inference
             (DATA / "fasta" / t["set"] / f"{t['tag']}.fasta").unlink(missing_ok=True)
             return {**t, "status": f"excluded: {type(e).__name__}: {e}"}
 
