@@ -5,7 +5,7 @@ name: OpenFold — ICE infrastructure and CAMEO structure-quality benchmark (Ope
 model: openfold
 model_version: "2.2.0"
 status: complete
-date_run: "2026-10-12"
+date_run: "2026-10-26"
 submitted_by: Boyang Gong
 
 description: >
@@ -25,34 +25,34 @@ environment:
     cuda_version: "12.4"
     nvidia_driver: "615.71.09"
   hardware_notes: >
-    Georgia Tech ICE, one GPU per Slurm array task, 8 CPU cores, 64 GB RAM. Tasks landed on
-    NVIDIA H100 80GB HBM3 and H200 141GB nodes (Slurm feature HX00).
+    Georgia Tech ICE, one GPU per Slurm array task, 8 CPU cores, 64 GB RAM, Slurm feature HX00.
+    Canonical run on NVIDIA H200 141GB; an earlier, byte-identical run also used H100 80GB HBM3.
 
 # ── Infrastructure benchmarks ─────────────────────────────────────────────────
 
 infrastructure:
   setup:
-    slurm_job: 6201042
+    slurm_job: 6601181
     description: Miniforge + pinned conda env + CUDA kernel build + weights + input staging (CPU only)
     cpu_cores: 8
-    elapsed_min: 23.8
-    peak_ram_gb: 32     # MaxRSS incl. page cache; now requests 64 GB
+    elapsed_min: 18.4
+    peak_ram_gib: 33    # MaxRSS incl. page cache; requests 64 GB
     downloaded_gb: 16
-    scratch_footprint_gb: 31
+    scratch_footprint_gb: 30
 
   inference:
-    precision: fp32 (TF32 matmuls, PyTorch default)
+    precision: fp32 weights, TF32 matmuls (OpenFold sets matmul precision "high")
     recycles: 3
     relaxation: skipped
-    gpu_hours_allocated: 2.25        # jobs 6201043 + 6201044, task wall time
+    gpu_hours_allocated: 2.29        # jobs 6601182 + 6601183, task wall time
     gpu_hours_forward_pass: 1.6      # sum of timings.json
-    wall_min_per_array_task: [24.7, 23.0, 57.2, 23.4]   # task 2: throttled H200
-    seconds_per_target_openfold_templates:   # median, unthrottled GPUs
-      lt_200_residues: 2.5
-      200_to_400_residues: 7.4
-      400_to_700_residues: 19.5
-      max: 41.2                              # 678 residues
-    host_ram_peak_gb: 10.7
+    wall_min_per_array_task: [23.5, 22.6, 59.9, 23.0]   # task 2: slow H200, see README
+    seconds_per_target_openfold_templates:   # median, H200
+      lt_200_residues: 2.4
+      200_to_400_residues: 6.7
+      400_to_700_residues: 17.2
+      max: 35.6                              # 678 residues
+    host_ram_peak_gib: 10.3
     gpu_memory_notes: >
       All targets (<= 678 residues) fit on an 80 GB H100 with default chunking. nvidia-smi reports
       80 GB (H100) / 140 GB (H200) because PyTorch's caching allocator grows into free memory;
@@ -114,7 +114,9 @@ science_metrics:
   smoke_test_6kwc:
     ca_rmsd_vs_bundled_reference_angstrom: {openfold_templates: 0.049, alphafold2_templates: 0.373}
     lddt_ca_vs_experimental: [0.963, 0.983]   # range over 4 weight sets
-    bitwise_reproducible: true   # across env builds and H100/H200
+    bitwise_reproducible: true   # 3 env builds; H100 and H200
+
+  cameo_predictions_bitwise_reproducible: true   # all 436; clean runs 6201044 and 6601183
 
   success_criteria:
     mean_within_0_02_of_published: pass
@@ -122,10 +124,11 @@ science_metrics:
     smoke_within_0_5_angstrom: pass
 
 cost_and_energy:
-  gpu_hours: 2.25
-  cpu_hours_setup: 3.2
+  gpu_hours: 2.29
+  cpu_hours_setup: 2.5
   notes: ICE is an instructional cluster with no per-hour charge; energy accounting is not reported (energy_used=0).
 
 notes: >
   Results: registry/models/biology/openfold/results/summary.json and metrics.csv.
+  Peer-reproduced on a V100 (smoke test + 5 shortest chains) in the PR #44 review.
   Cite Ahdritz et al., Nature Methods 21, 1514–1524 (2024) and Jumper et al., Nature 596, 583–589 (2021).

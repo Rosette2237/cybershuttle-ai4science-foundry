@@ -95,7 +95,7 @@ readiness:
   benchmark_status: complete
   optimization_status: not-started
   workflow_status: validated
-  last_updated: "2026-10-12"
+  last_updated: "2026-10-26"
   notes: >
     Reproducible inference workflow validated on Georgia Tech ICE (H100/H200). On 109 CAMEO
     chains OpenFold finetuning_ptm_2 scores mean lDDT-Ca 0.9096 (published 0.9097) and matches

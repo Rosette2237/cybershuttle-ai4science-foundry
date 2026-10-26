@@ -9,6 +9,7 @@ export OF_RUNS=$OF_ROOT/runs          # outputs: <set>/<weight set>/
 export OF_COMMIT=e938c184a291bf053af3b14c1e3e8bb29aee57e2   # tag v2.2.0
 export MINIFORGE_VERSION=26.5.3-0
 export MAX_TEMPLATE_DATE=2021-10-10   # OpenFold training template cutoff
+export KMP_AFFINITY=none              # as upstream's installer sets
 # Caches off the 30 GB home quota
 export CONDA_PKGS_DIRS=$OF_ROOT/miniforge3/pkgs PIP_CACHE_DIR=$OF_ROOT/cache/pip TRITON_CACHE_DIR=$OF_ROOT/cache/triton
 

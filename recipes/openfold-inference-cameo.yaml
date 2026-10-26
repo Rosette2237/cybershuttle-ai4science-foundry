@@ -16,7 +16,7 @@ description: >
 
 prerequisites:
   - Georgia Tech ICE account (or any Slurm cluster with an sm_70+ NVIDIA GPU and outbound HTTPS)
-  - ~40 GB of scratch space (31 GB used); no sequence databases are needed
+  - ~40 GB of scratch space (30 GB used); no sequence databases are needed
 
 input:
   targets: archived CAMEO 3D target list (Wayback snapshot, sha256-checked)
@@ -68,7 +68,7 @@ resource_requirements:
     gpu: false
     cpu_cores: 8
     ram_gb: 64
-    estimated_runtime: "~25 min (clean build, job 6201042)"
+    estimated_runtime: "~20 min (clean build, job 6601181)"
   inference:
     gpu: true
     gpu_count: 1
@@ -76,7 +76,7 @@ resource_requirements:
     cpu_cores: 8
     ram_gb: 64
     estimated_runtime: "~25 min per array task for 109 chains (34-678 residues)"
-  storage_gb: 31
+  storage_gb: 30
 
 compatible_resource_profiles:
   - resource-profiles/ice/ice-h100-h200.yaml

@@ -30,7 +30,7 @@ bundled example is reproduced to 0.05 Å, and repeated runs are byte-identical a
 | 4. Evaluation | [scripts/evaluate.py](scripts/evaluate.py) | login node (≈2 min CPU) | lDDT-Cα, GDT-TS and Cα-RMSD against the experimental structures, plus the success criteria |
 
 [scripts/config.sh](scripts/config.sh) holds every path and version shared by the scripts. Large
-artifacts (env, weights, inputs, predictions; ≈31 GB) live under `$OF_ROOT` (default
+artifacts (env, weights, inputs, predictions; ≈30 GB) live under `$OF_ROOT` (default
 `~/scratch/openfold-repro`), never in git.
 
 **Weight sets.** Each OpenFold checkpoint is paired with the AF2 model that uses the same configuration preset:
@@ -70,7 +70,7 @@ and constraint lines.
 git clone -b add-openfold https://github.com/cyber-shuttle/cybershuttle-ai4science-foundry.git
 cd cybershuttle-ai4science-foundry/registry/models/biology/openfold   # every script runs from here
 
-setup=$(sbatch --parsable scripts/setup.sh)                                      # ~25 min, CPU
+setup=$(sbatch --parsable scripts/setup.sh)                                      # ~20 min, CPU
 smoke=$(sbatch --parsable --dependency=afterok:$setup scripts/run_inference.sh smoke)   # ~2 min, 4 GPUs
 cameo=$(sbatch --parsable --dependency=afterok:$smoke scripts/run_inference.sh cameo)   # ~25 min, 4 GPUs
 squeue -u $USER                                                                  # wait until empty
@@ -89,7 +89,8 @@ job can simply be resubmitted. To use another GPU type, override the constraint 
 # 1. Weights: setup.sh checks the downloads against results/weights.sha256 ("OK" lines in its log).
 # 2. Inputs: results/data_manifest.tsv is regenerated; it should be identical to the committed one.
 git diff --stat results/data_manifest.tsv
-# 3. Smoke predictions should be byte-identical to the committed ones (they were on H100 and H200).
+# 3. Smoke predictions: byte-identical to the committed ones on H100/H200. Other GPUs (e.g. V100, no TF32)
+#    differ slightly by design; compare their scores in results/metrics.csv instead.
 for c in openfold_templates alphafold2_templates openfold_no_templates alphafold2_no_templates; do
   cmp $OF_RUNS/smoke/$c/predictions/6KWC_1_*_unrelaxed.pdb results/predictions/smoke/$c.pdb && echo "$c identical"
 done
@@ -166,14 +167,15 @@ All numbers below come from [results/summary.json](results/summary.json). Per-ta
 |---|---|---|---|
 | OpenFold code | <https://github.com/aqlaboratory/openfold> | tag `v2.2.0`, commit `e938c184a291bf053af3b14c1e3e8bb29aee57e2` | `git clone` + `checkout` in `setup.sh` |
 | Python environment | [environment.yml](environment.yml) | full pin (230 conda packages with build strings + 10 pip packages), Python 3.10.22, PyTorch 2.5.1, CUDA 12.4 | `conda env create` with Miniforge `26.5.3-0` |
+| Stereochemistry table | OpenStructure `stereo_chemical_props.txt` (LGPL-3.0), `git.scicore.unibas.ch/schwede/openstructure` at commit `7102c636`; fallback: [Software Heritage blob](https://archive.softwareheritage.org/api/1/content/sha1_git:25262efd7689fc76f4d6ea1a7c75e342e840ea1d/raw/) | sha256 `24510899eeb49167…` (asserted) | `setup.sh` (60 s timeout); read only by relaxation/training |
 | OpenFold weights | `s3://openfold/openfold_params/` (Registry of Open Data on AWS) | release `v06_22`: `finetuning_ptm_2.pt`, `finetuning_no_templ_ptm_1.pt` | upstream `scripts/download_openfold_params.sh`; sha256 in [results/weights.sha256](results/weights.sha256) |
 | AF2 weights | `https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar` | `params_model_1_ptm.npz`, `params_model_3_ptm.npz` | upstream `scripts/download_alphafold_params.sh`; sha256 in [results/weights.sha256](results/weights.sha256) |
 | CAMEO target list | CAMEO 3D `1-year` target list ending 2022-01-15, [Wayback snapshot 2023-08-07](https://web.archive.org/web/20230807161458id_/https://cameo3d.org/modeling/targets/1-year/ajax/?to_date=2022-01-15) | sha256 `b7b680a09536de3f…` (asserted) | `prepare_data.py` |
-| Alignments + template hits | OpenProteinSet, `s3://openfold/pdb/<chain>/{a3m,hhr}` | public bucket (accessed 2026-10-12); per-chain sha256 in the manifest | `prepare_data.py` (HTTPS, no AWS account) |
+| Alignments + template hits | OpenProteinSet, `s3://openfold/pdb/<chain>/{a3m,hhr}` | public bucket (accessed 2026-10-12 and 2026-10-26, identical); per-chain sha256 in the manifest | `prepare_data.py` (HTTPS, no AWS account) |
 | Duplicate-chain map | `s3://openfold/duplicate_pdb_chains.txt` | sha256 `73cf5d547cfcb291…` (logged) | `prepare_data.py` |
 | Template release dates | `s3://openfold/data_caches/mmcif_cache.json` | sha256 `ab8a3ad21a8cfcde…` (logged) | `prepare_data.py`; passed as `--release_dates_path` |
 | Obsolete-PDB map | wwPDB `obsolete.dat`, [Wayback snapshot 2022-06-21](https://web.archive.org/web/20220621163601id_/https://files.rcsb.org/pub/pdb/data/status/obsolete.dat) | sha256 `8f14c08dd4d77fad…` (asserted) | `prepare_data.py`; passed as `--obsolete_pdbs_path` |
-| Experimental and template structures | RCSB PDB mmCIF, `https://files.rcsb.org/download/<ID>.cif` | current entry versions (accessed 2026-10-12); target mmCIF sha256 in the manifest | `prepare_data.py` (templates fetched on demand by OpenFold's own featurizer) |
+| Experimental and template structures | RCSB PDB mmCIF, `https://files.rcsb.org/download/<ID>.cif` | current entry versions (accessed 2026-10-12 and 2026-10-26, identical); target mmCIF sha256 in the manifest | `prepare_data.py` (templates fetched on demand by OpenFold's own featurizer) |
 | Smoke-test input and reference | `openfold/examples/monomer/` (6KWC chain A, 191 aa) | same commit | in the OpenFold clone |
 
 ## Compute resources
@@ -184,44 +186,54 @@ the canonical run (logs in [results/logs/](results/logs/); `sacct -j <id>` repro
 
 | Step | Job | Node / GPU | Requested | Elapsed | Notes |
 |---|---|---|---|---|---|
-| Setup | 6201042 | `ice-cpu`, atl1-1-02-010-3-1 | 8 CPU, 32 GB, 4 h | 23 min 46 s | Clean build from an empty `$OF_ROOT`. MaxRSS hit 32 GB (page cache), so the script now requests 64 GB |
-| Smoke | 6201043_[0-3] | `ice-gpu`: 3× H100 80 GB, 1× H200 141 GB | 1 GPU, 8 CPU, 64 GB each | 1 min 39 s each | |
-| CAMEO | 6201044_[0-3] | `ice-gpu`: tasks 0, 3 on H100; tasks 1, 2 on H200 | 1 GPU, 8 CPU, 64 GB each | 24:41, 23:02, 57:09, 23:22 | Task 2 landed on a thermally throttled H200 ([evidence](results/logs/troubleshooting/gpu-thermal-throttle-6201044_2.txt)); results are unaffected |
+| Setup | 6601181 | `ice-cpu`, atl1-1-01-002-36-0 | 8 CPU, 64 GB, 4 h | 18 min 25 s | Clean build from an empty `$OF_ROOT`; MaxRSS 33 GiB |
+| Smoke | 6601182_[0-3] | `ice-gpu`: H200 141 GB (2 nodes) | 1 GPU, 8 CPU, 64 GB each | 4:29, 2:59, 0:25, 0:22 | The first task on each node also loads the env from Lustre |
+| CAMEO | 6601183_[0-3] | `ice-gpu`: H200 141 GB (tasks 0, 1, 3 on one node; task 2 on another) | 1 GPU, 8 CPU, 64 GB each | 23:27, 22:37, 59:56, 23:00 | Task 2 was slow; see below |
 | Evaluation | — | login node, 1 CPU | — | ≈2 min | |
 
-- **GPU time:** 2.2 GPU-hours allocated in total, of which 1.6 h is model forward passes (`timings.json`). Per-target
-  GPU time on an unthrottled H100/H200 (OpenFold, templates) has a median of 2.5 s below 200 residues, 7.4 s for 200–400,
-  and 19.5 s for 400–700; the maximum is 41 s at 678 residues. CPU featurization (MSA parsing, kalign template realignment) adds a few seconds per target.
-- **Memory:** every target (≤ 678 residues) fits on an 80 GB H100 with OpenFold's default chunking. nvidia-smi
+- **GPU time:** 2.3 GPU-hours allocated in total, of which 1.6 h is model forward passes (`timings.json`). Per-target
+  GPU time on an H200 (OpenFold, templates) has a median of 2.4 s below 200 residues, 6.7 s for 200–400, and 17.2 s for
+  400–700; the maximum is 36 s at 678 residues. That is about 10% faster than on an H100 in the first run. CPU featurization (MSA parsing,
+  kalign template realignment) adds a few seconds per target.
+- **Slow task:** in both full runs, the `openfold_no_templates` task (both times on an H200) ran about 3.5× slower than
+  the other three. In the first run, nvidia-smi caught that GPU in thermal slowdown (86–87 °C, SM clock down to 345 MHz;
+  [evidence](results/logs/troubleshooting/gpu-thermal-throttle-6201044_2.txt)); the second run's node was not instrumented.
+  Both `model_3_ptm` weight sets run the same compute graph, and this one was not slow in the smoke tests, so a hardware
+  cause is likely but unproven. The predictions are byte-identical either way.
+- **Memory:** every target (≤ 678 residues) fits on an 80 GB H100 (first run) with OpenFold's default chunking. nvidia-smi
   reports the card as nearly full (80 GB on H100, 140 GB on H200) only because PyTorch's caching allocator grows into free
-  memory, so that figure is not a requirement. Host RAM peaked at 10.7 GB per GPU task.
-- **Storage:** about 31 GB on scratch: env 13 GB, Miniforge and package cache 6.8 GB, weights 8.7 GB (the full OpenFold and
+  memory, so that figure is not a requirement. Host RAM peaked at about 10 GiB per GPU task.
+- **Storage:** about 30 GB on scratch: env 13 GB, Miniforge and package cache 6.8 GB, weights 8.7 GB (the full OpenFold and
   AF2 parameter sets, of which 4 files are used), inputs 1.7 GB (609 mmCIFs, 110 alignment sets), predictions 70 MB. About
   16 GB is downloaded (conda packages ≈6 GB, weights ≈9 GB, inputs ≈1.7 GB).
 
 ## Troubleshooting and deviations
 
-Each problem below was hit during development, diagnosed, and fixed in the scripts. The failing logs
-are kept in [results/logs/troubleshooting/](results/logs/troubleshooting/).
+Each problem below was hit during development or peer review, diagnosed, and fixed in the scripts. Logs of
+failed and earlier runs are kept in [results/logs/troubleshooting/](results/logs/troubleshooting/).
 
 | # | Symptom | Cause | Fix |
 |---|---|---|---|
 | 1 | The CAMEO endpoint used by upstream's `scripts/download_cameo.py` returns HTTP 503 | CAMEO moved its 3D targets API to `archive.cameo3d.org`, which is offline; the new site has no equivalent endpoint | Use the Wayback Machine's archived copy of the 1-year target list (pinned by sha256) and select OpenFold's 3-month window from it |
 | 2 | Kernel build: `x86_64-conda-linux-gnu-c++: fatal error: cannot execute 'cc1plus'` (job 6200320) | Upstream `environment.yml` installs only `gcc`; the C++ compiler is in `gxx` | Added `gxx=12.4` to the env |
-| 3 | Same error with `gxx` installed (job 6200530) | PACE's default `gcc/12.3.0` module exports `GCC_ROOT`, which conda-forge's GCC uses to find `cc1plus`, so it searched the system GCC tree | `activate_env` unsets `GCC_ROOT`. `setup.sh` now checks `import attn_core_inplace_cuda` because upstream's installer exits 0 even when the build fails |
+| 3 | Same error with `gxx` installed (job 6200530) | PACE's default `gcc/12.3.0` module exports `GCC_ROOT`, which conda-forge's GCC uses to find `cc1plus`, so it searched the system GCC tree | `activate_env` unsets `GCC_ROOT`. `setup.sh` checks `import attn_core_inplace_cuda` after the build, since upstream's installer exited 0 on failure |
 | 4 | `flash-attn` in upstream `environment.yml` | Sdist-only package that imports torch at build time, so it fails in pip's isolated build; it is also unused for inference | Removed |
 | 5 | `ValueError: Could not find CIFs in …/templates` (job 6200624) | OpenFold's template featurizer refuses an empty mmCIF directory | Experimental structures and templates share one `mmcif/` directory, as in upstream's training layout. The date cutoff (and an assertion) keeps targets from being their own templates |
 | 6 | `RecursionError` in `_parse_obsolete` (job 6200665) | Today's wwPDB `obsolete.dat` contains a self-referencing entry (`8UJJ → 8UJJ`, 2025-12-24) that OpenFold v2.2.0 follows forever | Use a 2022-06-21 snapshot, which matches the date of OpenProteinSet (pinned by sha256) |
 | 7 | 72 of 181 window chains have no alignment | OpenProteinSet's PDB snapshot ends mid-December 2021 | Evaluate on the 109 covered chains (the complete first 8 weekly releases), with the exclusions listed in the manifest |
-| 8 | Setup job MaxRSS reached its 32 GB request | Slurm counts page cache from the multi-GB downloads | Job completed. `setup.sh` now requests 64 GB for headroom |
+| 8 | Setup MaxRSS reached its 32 GB request (job 6201042) | Slurm counts page cache from the multi-GB downloads | `setup.sh` now requests 64 GB; the clean rerun (6601181) peaked at 33 GiB |
+| 9 | Setup hangs downloading `stereo_chemical_props.txt` (PR #44 peer review) | Upstream's `install_third_party_dependencies.sh` uses `wget -N` with no timeout (defaults: 20 tries × 900 s) against one third-party host | `setup.sh` skips the installer. It fetches the file with a 60 s timeout and a Software Heritage fallback, checks its sha256, and runs `python setup.py install`. The installer's other steps are test/training-only; `KMP_AFFINITY=none` is kept in `config.sh` |
 
 `prepare_data.py` runs OpenFold's own `DataPipeline.process_fasta` on every target before any GPU
 time is spent, and downloads each template mmCIF the featurizer asks for. The GPU jobs therefore read exactly the
 files that were staged, and the templates OpenFold selected are recorded in the manifest.
 
-**Determinism.** The four smoke predictions were produced twice: once from an environment solved from upstream's
-loose spec (setup 6200737, smoke 6200939) and once from a clean rebuild using the pinned [environment.yml](environment.yml) (job 6201043), on
-different nodes and GPU models (H200 vs H100). The PDB files are byte-identical.
+**Determinism.** Every prediction was reproduced byte-for-byte across independent clean builds:
+- the 4 smoke predictions three times: an environment solved from upstream's loose spec (job 6200939), then the pinned
+  [environment.yml](environment.yml) (jobs 6201043 and 6601182);
+- all 436 CAMEO predictions twice, two weeks apart (jobs 6201044 and 6601183).
+
+The runs used different nodes and both H100 and H200 GPUs. The re-staged input manifest was also identical.
 
 ## Limitations
 
@@ -237,8 +249,9 @@ different nodes and GPU models (H200 vs H100). The PDB files are byte-identical.
 - **Live inputs.** RCSB mmCIFs and the OpenProteinSet bucket are fetched as they are today. The manifest records sha256
   checksums so any later drift is detectable. Two inputs come from Wayback snapshots, which pins them but depends on
   archive.org.
-- **Hardware.** Validated on H100 and H200 only. The CUDA kernel is also built for sm_52/61/70/80, but other GPUs were
-  not tested.
+- **Hardware.** Validated on H100 and H200. In the PR #44 peer review, the smoke test and the five shortest CAMEO
+  chains also reproduced on a V100 (sm_70) with closely matching scores. Small differences are expected there because V100
+  has no TF32. Other GPUs (A100, L40S, …) are untested.
 
 ## Licenses and citation
 

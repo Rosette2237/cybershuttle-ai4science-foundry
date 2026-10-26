@@ -23,12 +23,19 @@ fi
 [ -d "$OF_REPO/.git" ] || git clone https://github.com/aqlaboratory/openfold.git "$OF_REPO"
 git -C "$OF_REPO" checkout -q "$OF_COMMIT"
 
-# 3. Conda env + upstream installer (resources, CUDA kernel)
+# 3. Conda env + OpenFold build (CUDA kernel)
+# - Not upstream's installer: its wget has no timeout; other steps are test/training-only
+# - stereo_chemical_props.txt: pinned URL, Software Heritage fallback, sha256-checked
 [ -d "$OF_ENV" ] || "$OF_ROOT/miniforge3/bin/conda" env create -q -p "$OF_ENV" -f environment.yml
 activate_env
 if ! python -c "import torch, attn_core_inplace_cuda" 2>/dev/null; then
-    (cd "$OF_REPO" && bash scripts/install_third_party_dependencies.sh)
-    python -c "import torch, attn_core_inplace_cuda"  # installer hides build failures
+    PROPS=$OF_REPO/openfold/resources/stereo_chemical_props.txt
+    URL=https://git.scicore.unibas.ch/schwede/openstructure/-/raw/7102c63615b64735c4941278d92b554ec94415f8/modules/mol/alg/src/stereo_chemical_props.txt
+    MIRROR=https://archive.softwareheritage.org/api/1/content/sha1_git:25262efd7689fc76f4d6ea1a7c75e342e840ea1d/raw/
+    wget -q -T 60 -t 2 -O "$PROPS" "$URL" || wget -q -T 60 -t 2 -O "$PROPS" "$MIRROR"
+    echo "24510899eeb49167cffedec8fa45363a4d08279c0c637a403b452f7d0ac09451  $PROPS" | sha256sum -c
+    (cd "$OF_REPO" && python setup.py install)
+    python -c "import torch, attn_core_inplace_cuda"  # verify the kernel
 fi
 
 # 4. Weights via upstream scripts; checked against results/weights.sha256

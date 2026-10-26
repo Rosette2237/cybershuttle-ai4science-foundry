@@ -8,8 +8,8 @@
       "median_rmsd_ca": 1.5906554460525513,
       "mean_plddt": 89.5952540073136,
       "pearson_plddt_vs_lddt_ca": 0.8297216918758537,
-      "inference_gpu_hours": 0.25410110202322056,
-      "nvidia_smi_peak_memory_mib": 80147
+      "inference_gpu_hours": 0.22345555531941094,
+      "nvidia_smi_peak_memory_mib": 143173
     },
     "alphafold2_templates": {
       "n_scored": 109,
@@ -19,7 +19,7 @@
       "median_rmsd_ca": 1.4958864450454712,
       "mean_plddt": 88.9080585329357,
       "pearson_plddt_vs_lddt_ca": 0.8075685417314459,
-      "inference_gpu_hours": 0.2457798628572588,
+      "inference_gpu_hours": 0.24617050451317077,
       "nvidia_smi_peak_memory_mib": 142805
     },
     "openfold_no_templates": {
@@ -30,7 +30,7 @@
       "median_rmsd_ca": 1.5631065368652344,
       "mean_plddt": 89.65559474781685,
       "pearson_plddt_vs_lddt_ca": 0.8152410305900539,
-      "inference_gpu_hours": 0.8186665145853476,
+      "inference_gpu_hours": 0.8531818526435462,
       "nvidia_smi_peak_memory_mib": 143173,
       "published_mean_lddt_ca": 0.9025,
       "delta_vs_published": 0.0068097090174299435,
@@ -44,8 +44,8 @@
       "median_rmsd_ca": 1.437597632408142,
       "mean_plddt": 89.43842664247927,
       "pearson_plddt_vs_lddt_ca": 0.8844271103073656,
-      "inference_gpu_hours": 0.2788307298280577,
-      "nvidia_smi_peak_memory_mib": 80709,
+      "inference_gpu_hours": 0.2462823139902644,
+      "nvidia_smi_peak_memory_mib": 142805,
       "published_mean_lddt_ca": 0.9097,
       "delta_vs_published": -0.00014249123389564744,
       "criterion_within_0_02_of_published": true
